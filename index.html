@@ -41,7 +41,7 @@
 
   <div id="chat"></div>
   <div class="row">
-    <input id="q" placeholder="Ask a customer question… (try: can I return a wetsuit?)" disabled>
+    <input id="q" placeholder="Ask a customer question… (try: can I return flowers?)" disabled>
     <button id="send" disabled>Send</button>
   </div>
 </main>
@@ -86,18 +86,46 @@ import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17
    plays both roles — your write-up should call that out.
 ----------------------------------------------------------------------------*/
 const DOCS = [
-  { title: "Return Policy",
-    text: "Unused gear can be returned within 30 days with a receipt for a full refund. Wetsuits can be returned only if unworn with tags attached. Surfboards are final sale once waxed." },
-  { title: "Shipping & Delivery",
-    text: "Orders over $75 ship free in the continental US. Standard shipping takes 3 to 5 business days. Surfboards ship freight and take 7 to 10 business days." },
-  { title: "Store Hours & Location",
-    text: "We are open 9am to 7pm Monday through Saturday and 10am to 5pm on Sunday. The shop is two blocks from the North Beach pier, with free parking behind the building." },
-  { title: "Wetsuit Sizing Guide",
-    text: "Wetsuit sizes run from XS to XXL and are based on height and chest measurement. If you are between sizes, size down for performance or up for comfort. We offer free in-store fitting." },
-  { title: "Board Rentals",
-    text: "Soft-top rentals are $25 per day or $90 per week, with a valid photo ID held as deposit. Rentals include a leash and a bar of wax. Damage beyond normal wear is billed at repair cost." },
-  { title: "Repairs & Ding Service",
-    text: "We repair dings, cracks, and delamination on most boards. Small ding repairs run $30 to $60 and take about a week. Free estimates at the counter — no appointment needed." },
+  {
+    title: "Return Policy",
+    text: "Fresh flowers may be returned within 24 hours with a receipt if they arrive damaged. Custom arrangements are non-refundable unless there is a quality issue."
+  },
+  {
+    title: "Delivery Information",
+    text: "We offer same-day delivery for orders placed before 2:00 PM within the local area. Standard delivery is available Monday through Saturday."
+  },
+  {
+    title: "Store Hours",
+    text: "Our flower shop is open Monday through Saturday from 9:00 AM to 6:00 PM. We are closed on Sundays except for holiday events."
+  },
+  {
+    title: "Wedding Floral Services",
+    text: "We create custom floral arrangements for weddings and special events. Consultations must be scheduled at least two weeks in advance."
+  },
+  {
+    title: "Plant Care",
+    text: "Indoor plants should be watered according to their care instructions. We provide free care guides with every plant purchase."
+  },
+  {
+    title: "Gift Baskets",
+    text: "Gift baskets can include flowers, chocolates, candles, and stuffed animals. Custom gift baskets require 24 hours' notice."
+  },
+  {
+    title: "Holiday Orders",
+    text: "Holiday orders are accepted while supplies last. We recommend placing Valentine's Day and Mother's Day orders at least one week early."
+  },
+  {
+    title: "Flower Subscriptions",
+    text: "Customers can subscribe to receive fresh flowers weekly or monthly. Subscription plans may be canceled anytime before the next delivery."
+  },
+  {
+    title: "Payment Methods",
+    text: "We accept Visa, Mastercard, American Express, Discover, Apple Pay, and cash. Payment is required before delivery."
+  },
+  {
+    title: "Customer Support",
+    text: "Our customer support team is available during business hours by phone or email. We respond to most inquiries within one business day."
+  }
 ];
 
 /* ----------------------------------------------------------------------------
@@ -160,9 +188,25 @@ function retrieve(questionVector) {
 // CONTEXT_LIMIT character budget, trim the OLDEST turns to fit before each
 // answer, and show the user which messages fell outside the window.
 const history = [];
+const CONTEXT_LIMIT = 300;
+const THRESHOLD = 0.45;
+function trimHistory() {
+    let total = history.reduce((sum, msg) => sum + msg.text.length, 0);
+
+    while (total > CONTEXT_LIMIT && history.length > 0) {
+        const removed = history.shift();
+        total -= removed.text.length;
+
+        const notice = document.createElement("div");
+        notice.className = "msg bot";
+        notice.textContent = "(Older message removed from context window.)";
+        chatEl.appendChild(notice);
+    }
+}
 
 function addMessage(who, text, srcNote) {
   history.push({ who, text });
+  trimHistory();
   const div = document.createElement('div');
   div.className = 'msg ' + who;
   div.textContent = text;
@@ -182,6 +226,13 @@ async function answer(question) {
 
   // [RETRIEVE] the nearest document and its similarity score.
   const { doc, score } = retrieve(qv);
+  if (score < THRESHOLD) {
+    addMessage(
+        "bot",
+        "I'm sorry, I couldn't find any information about that in our flower shop documents."
+    );
+    return;
+}
 
   // PART 4 (your work): there is NO THRESHOLD here. Even a nonsense question
   // gets the closest document, stated confidently — a hallucination with a
@@ -190,7 +241,31 @@ async function answer(question) {
   // [GROUND] + [ANSWER]: reply by quoting the evidence, citing the source.
   // PART 2 (your work): this template ignores the system prompt box — make
   // the persona and boundary rules come from that configuration instead.
-  const reply = 'Here is what our "' + doc.title + '" policy says: ' + doc.text;
+  const prompt = document.getElementById('systemPrompt').value;
+
+let greeting = "Hello!";
+
+if (prompt.toLowerCase().includes("friendly")) {
+    greeting = "Hello! 🌸";
+} else if (prompt.toLowerCase().includes("professional")) {
+    greeting = "Good day.";
+}
+
+if (
+    question.toLowerCase().includes("politics") ||
+    question.toLowerCase().includes("religion") ||    
+    question.toLowerCase().includes("race")||
+    question.toLowerCase().includes("gender")||
+    question.toLowerCase().includes("sexual orientation")||
+    question.toLowerCase().includes("vote")
+  
+
+) {
+    addMessage("bot", greeting + " Sorry, I can only answer questions about our flower shop.");
+    return;
+}
+
+const reply = greeting + ' Here is what our "' + doc.title + '" policy says: ' + doc.text;
   addMessage('bot', reply, 'source: ' + doc.title + ' · similarity ' + score.toFixed(3));
 }
 
